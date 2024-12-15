@@ -1,0 +1,110 @@
+- name: Find the secrets yamls
+  ansible.builtin.find:
+    paths: "{{ yaml_secrets_path }}"
+    patterns: "*.yaml"
+  register: secrets_yamls
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Apply secrets yamls
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ item.path }}"
+  loop: "{{ secrets_yamls.files }}"
+  register: kubernetes_apply_result
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Pause for apps to load
+  ansible.builtin.pause:
+    minutes: 3
+
+- name: Generate random 3-character alphanumeric suffix
+  ansible.builtin.set_fact:
+    random_suffix: "{{ lookup('password', '/dev/null chars=ascii_lowercase,digits length=3') }}"
+
+
+- name: Setup Nginx reverse proxy
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/nginx/sites-available/default
+    - /etc/nginx/sites-enabled/default
+  become: true
+
+- name: Add include passthrough.conf to nginx
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/nginx.conf
+    line: "include /etc/nginx/passthrough.conf;"
+    state: present
+    insertbefore: "^http {"
+  become: true
+
+- name: Create passthrough.conf
+  ansible.builtin.copy:
+    dest: /etc/nginx/passthrough.conf
+    content: |
+      stream {
+          server {
+              listen 443;
+              proxy_pass 127.0.0.1:31443;
+          }
+      }
+    mode: '0644'
+  become: true
+
+- name: Create thejeremyharrington.net files
+  ansible.builtin.copy:
+    dest: /etc/nginx/sites-available/thejeremyharrington.net
+    content: |
+      server {
+          if ($host ~ ^[^.]+\.thejeremyharrington\.net$) {
+              return 301 https://$host$request_uri;
+          }
+          listen 80;
+      }
+    mode: '0644'
+  become: true
+
+- name: Create /etc/nginx/sites-enabled/thejeremyharrington.net
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/thejeremyharrington.net
+    dest: /etc/nginx/sites-enabled/thejeremyharrington.net
+    state: link
+  become: true
+
+- name: Test nginx configuration
+  ansible.builtin.command: nginx -t
+  register: nginx_test
+  failed_when: nginx_test.rc != 0
+  changed_when: false
+  become: true
+
+- name: Start and enable nginx
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+    enabled: true
+  become: true
+
+- name: Get argocd initial password
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: argocd-initial-admin-secret
+    namespace: argocd
+  register: argocd_secret
+  failed_when: argocd_secret is not defined
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Decode ArgoCD initial password
+  ansible.builtin.set_fact:
+    argocd_initial_pw: "{{ argocd_secret.resources[0].data.password | b64decode }}"
+  when: argocd_secret.resources | length > 0
+
+- name: Show the password
+  ansible.builtin.debug:
+    msg: "!!!REMINDER!!!\nArgoCD initial admin password: {{ argocd_initial_pw }}"
+  when: argocd_initial_pw is defined

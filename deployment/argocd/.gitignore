@@ -1,0 +1,21 @@
+# vim things
+tags
+tags.lock
+*.swp
+
+# ansible things
+.vault
+
+# python things
+*.pyc
+
+# Never commit unencrypted secrets
+applications/*/secrets.yml
+applications/*/secrets.yaml
+
+# Helm stuff should not be committed
+Chart.lock
+applications/*/charts/*
+
+# Special ignore for lazy
+ignore*

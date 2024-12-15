@@ -1,0 +1,66 @@
+# Terraform
+**/.terraform/*
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfstate*
+.tfplan
+credentails.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+locals.tf
+crash.log
+crash.*.log
+.terraform.tfstate.lock.info
+.terraformrc
+terraform.rc
+
+# Mac
+.DS_Store
+
+# Trash
+.DS_Store
+Thumbs.db
+
+# Temp folders
+.temp*
+.private/
+.logs/
+.task/
+
+# Sops
+.secrets*
+.decrypted~*
+*.agekey
+sops-key*
+
+# Kubernetes
+kubeconfig*
+talosconfig*
+*.pub
+*.key
+
+# Extras
+config.xml
+*.pid
+kubernetes
+
+# VS Code
+.vscode
+
+# Binaries
+*.xz
+*.zip
+*.tar.gz
+*.tar.xz
+bin
+*.iso
+
+# Packer
+local.pkrvars.hcl
+downloaded_iso_path
+

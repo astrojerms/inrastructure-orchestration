@@ -1,0 +1,14 @@
+apiVersion: v1
+stringData:
+  password: "{{ lookup('env', 'GIT_SECRET') }}"
+  project: default
+  type: git
+  url: https://github.com/astrojerms/tjh-infra
+  username: argocd
+kind: Secret
+metadata:
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  name: application-repo
+  namespace: argocd
+type: Opaque

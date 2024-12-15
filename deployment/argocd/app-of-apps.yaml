@@ -1,0 +1,19 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-applications
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: argocd
+  project: default
+  source:
+    path: argocd/applications
+    repoURL: https://github.com/astrojerms/the-infra.git
+    targetRevision: HEAD
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

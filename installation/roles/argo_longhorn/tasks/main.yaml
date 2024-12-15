@@ -1,0 +1,133 @@
+- name: Create namespaces using kubernetes.core.k8s
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ item }}"
+  loop:
+    - argocd
+    - longhorn-system
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Wait until argocd namespace is created
+  retries: 10
+  delay: 5
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: argocd
+  register: argocd_namespace_status
+  until: argocd_namespace_status.resources | length > 0
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Debug argocd namespace status
+  ansible.builtin.debug:
+    var: argocd_namespace_status
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Install ArgoCD
+  kubernetes.core.k8s:
+    state: present
+    src: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    namespace: argocd
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Wait for ArgoCD API server to be ready
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    namespace: argocd
+    name: argocd-server
+  register: argocd_status
+  retries: 12
+  delay: 30
+  until: argocd_status.resources[0].status.conditions[0].status == "True"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Install Longhorn Components
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ item }}"
+    namespace: longhorn-system
+  loop:
+    - "https://raw.githubusercontent.com/longhorn/longhorn/{{ longhorn_version }}/deploy/prerequisite/longhorn-iscsi-installation.yaml"
+    - "https://raw.githubusercontent.com/longhorn/longhorn/{{ longhorn_version }}/deploy/prerequisite/longhorn-nfs-installation.yaml"
+    - "https://raw.githubusercontent.com/longhorn/longhorn/{{ longhorn_version }}/deploy/longhorn.yaml"
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Pause for longhorn pods to come Up
+  ansible.builtin.pause:
+    minutes: 2
+    prompt: 2 minute pause before patching longhorn storageclass
+
+- name: Patch Longhorn storage class to remove default
+  kubernetes.core.k8s:
+    state: patched
+    definition:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: longhorn
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "false"
+  failed_when: false
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Apply argo-repo.yaml
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ yaml_config_path }}/argo-repo.yaml"
+    namespace: argocd
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Copy known good ArgoCD configmap
+  ansible.builtin.copy:
+    src: ../../files/argocd-cm.yaml
+    dest: /tmp/argocd-cm.yaml
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Get argocd initial password
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: argocd-initial-admin-secret
+    namespace: argocd
+  register: argocd_secret
+  failed_when: argocd_secret is not defined
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Decode ArgoCD initial password
+  ansible.builtin.set_fact:
+    argocd_initial_pw: "{{ argocd_secret.resources[0].data.password | b64decode }}"
+  when: argocd_secret.resources | length > 0
+
+- name: Show the password
+  ansible.builtin.debug:
+    msg: "ArgoCD initial admin password: {{ argocd_initial_pw }}"
+  when: argocd_initial_pw is defined
+
+- name: Apply app-of-apps.yaml
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ yaml_config_path }}/app-of-apps.yaml"
+    namespace: argocd
+  become: true
+  become_user: "{{ ansible_user }}"
+
+- name: Pause for app of apps to load
+  ansible.builtin.pause:
+    minutes: 2
+    prompt: 2 minute pause before applying the secrets

@@ -1,0 +1,23 @@
+- name: Set up Kubernetes
+  hosts: all
+  become: true
+  roles:
+    - kubernetes
+
+- name: Deploy Cilium CNI
+  hosts: k8s_controlplane
+  become: true
+  roles:
+    - cilium
+
+- name: Install ArgoCD and Longhorn Storage
+  hosts: k8s_controlplane
+  become: true
+  roles:
+    - argo_longhorn
+
+- name: Configure Nginx
+  hosts: k8s_controlplane
+  become: true
+  roles:
+    - nginx

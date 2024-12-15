@@ -1,0 +1,12 @@
+apiVersion: v2
+appVersion: 0.0.1
+description: Argo CD is a continuous delivery tool for Kubernetes based on GitOps.
+icon: https://bitnami.com/assets/stacks/argo-cd/img/argo-cd-stack-220x234.png
+name: argo-cd
+version: 0.0.1
+
+dependencies:
+- condition: argocd.enabled
+  name: argo-cd
+  repository: https://github.com/bitnami/charts/tree/main/bitnami/argo-cd
+  version: 7.0.20

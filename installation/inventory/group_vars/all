@@ -1,0 +1,21 @@
+
+kube_version: "1.29.0"
+cilium_cli_version: "v0.16.19"
+cilium_version: "1.15.3"
+longhorn_version: "v1.6.0"
+cilium_arch: "amd64"
+crictl_config:
+  runtime_endpoint: "unix:///run/containerd/containerd.sock"
+  image_endpoint: "unix:///run/containerd/containerd.sock"
+  timeout: 2
+  debug: true
+  pull_image_on_create: false
+kubeconfig_file: "/etc/kubernetes/admin.conf"
+kubeconfig_dir: "/home/{{ ansible_user }}/.kube"
+kubeconfig_path: "/home/{{ ansible_user }}/.kube/config"
+tmp_kubeconfig_file: "/tmp/kubeconfig"
+yaml_base_path: "/home/{{ ansible_user }}"
+yaml_config_path: "{{ yaml_base_path }}/configs"
+yaml_secrets_path: "{{ yaml_base_path }}/secrets"
+ansible_user: "thejeremy"
+original_context: "kubernetes-admin@kubernetes"

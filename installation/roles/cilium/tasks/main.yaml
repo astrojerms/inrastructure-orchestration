@@ -1,0 +1,54 @@
+- name: Make /usr/local/bin/ writable
+  ansible.builtin.file:
+    path: /usr/local/bin
+    mode: '0777'
+    state: directory
+
+- name: Check if cilium is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/cilium
+  become: true
+  become_user: "{{ ansible_user }}"
+  register: cilium_installed
+  changed_when: false
+
+- name: Check Cilium status if binary exists
+  ansible.builtin.command:
+    cmd: cilium status
+  become: true
+  register: cilium_status_result
+  changed_when: false
+  failed_when: cilium_status_result.rc != 0
+  when: cilium_installed.stat.exists
+
+- name: Display Cilium status
+  ansible.builtin.debug:
+    msg: "{{ cilium_status_result.stdout }}"
+  when: cilium_installed.stat.exists and cilium_status_result is succeeded
+
+- name: Download Cilium CLI
+  ansible.builtin.get_url:
+    url: "https://github.com/cilium/cilium-cli/releases/download/{{ cilium_cli_version }}/cilium-linux-{{ cilium_arch }}.tar.gz"
+    dest: "/tmp/cilium-linux-{{ cilium_arch }}.tar.gz"
+    mode: '0755'
+  become: true
+  become_user: "{{ ansible_user }}"
+  when: not cilium_installed.stat.exists or cilium_status_result is failed
+
+- name: Extract Cilium CLI
+  ansible.builtin.unarchive:
+    src: "/tmp/cilium-linux-{{ cilium_arch }}.tar.gz"
+    dest: /usr/local/bin/
+    remote_src: true
+  become: true
+  become_user: "{{ ansible_user }}"
+  when: not cilium_installed.stat.exists or cilium_status_result is failed
+
+- name: Install Cilium
+  ansible.builtin.command:
+    cmd: cilium install --version "{{ cilium_version }}"
+  become: true
+  become_user: "{{ ansible_user }}"
+  register: cilium_install_result
+  changed_when: "'installed' in cilium_install_result.stdout"
+  when: not cilium_installed.stat.exists or cilium_status_result is failed
